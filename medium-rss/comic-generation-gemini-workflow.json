@@ -20,7 +20,7 @@
               "placeholder": "例如：第一章"
             },
             {
-              "fieldLabel": "提示词（可选）",
+              "fieldLabel": "提示词(可选)",
               "fieldType": "textarea",
               "requiredField": false,
               "placeholder": "例如：生成像《足球小将》那种专业分镜结构、漫画叙事节奏、对白气泡、拟声词、画格布局、视角变化、动态镜头，中文对白"
@@ -42,15 +42,8 @@
       "parameters": {
         "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent",
         "method": "POST",
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            {
-              "name": "key",
-              "value": "={{ $credentials.geminiApiKey }}"
-            }
-          ]
-        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"深刻理解《{{ $json.书名 }}》这本书，将{{ $json.章节 }}内容，{{ $json.提示词 || '生成像《足球小将》那种专业分镜结构、漫画叙事节奏、对白气泡、拟声词、画格布局、视角变化、动态镜头，中文对白。请生成一张完整的漫画分镜图。' }}\"\n    }]\n  }],\n  \"generationConfig\": {\n    \"response_modalities\": [\"IMAGE\"],\n    \"response_mime_type\": \"image/jpeg\"\n  }\n}",
@@ -69,8 +62,8 @@
       "position": [450, 300],
       "onError": "continueRegularOutput",
       "credentials": {
-        "geminiApi": {
-          "id": "gemini-api-key",
+        "httpHeaderAuth": {
+          "id": "gemini-api-credential",
           "name": "Gemini API Key"
         }
       }
@@ -81,16 +74,17 @@
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "strict"
+            "typeValidation": "strict",
+            "version": 2
           },
           "conditions": [
             {
               "id": "check-success",
               "leftValue": "={{ $json.candidates && $json.candidates.length > 0 }}",
-              "rightValue": "true",
               "operator": {
                 "type": "boolean",
-                "operation": "true"
+                "operation": "true",
+                "singleValue": true
               }
             }
           ],
@@ -196,6 +190,6 @@
   "staticData": null,
   "tags": [],
   "triggerCount": 1,
-  "updatedAt": "2026-01-14T12:45:00.000Z",
-  "versionId": "2"
+  "updatedAt": "2026-01-14T13:43:31.323Z",
+  "versionId": "3"
 }

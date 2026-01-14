@@ -237,23 +237,33 @@ return {
 4. 创建凭据（API Key）
 5. 复制 API Key
 
-### 2. 在 n8n 中配置 Credential
+### 2. 在 n8n 中配置 Credential（推荐方式）
 
-**方法 A：使用 HTTP Request 的 Query Parameters**（推荐）
+**使用 Header Auth 凭证**（最佳实践）
 
-在 "Gemini 生成图片" 节点中：
-1. 启用 "Send Query Parameters"
-2. 添加参数：
-   - Name: `key`
-   - Value: `YOUR_GEMINI_API_KEY`（直接粘贴）
+1. **创建新凭证**：
+   - 在 n8n 界面中进入 **Credentials** 页面
+   - 点击 **New Credential**
+   - 选择类型：**Header Auth**
 
-**方法 B：使用 Header Auth**
-
-1. 创建新凭证：**Header Auth**
-2. 配置：
+2. **配置凭证**：
    - Name: `x-goog-api-key`
-   - Value: `YOUR_GEMINI_API_KEY`
-3. 在节点中选择此凭证
+   - Value: 你的 Gemini API Key（例如：`AIzaSyXXXXXXXXXXXXXX`）
+   - 保存为：**Gemini API Key**
+
+3. **关联到工作流**：
+   - 打开 "漫画生成工作流 - Gemini 原生版本"
+   - 点击 "Gemini 生成图片" 节点
+   - 在 **Authentication** 部分选择 **Header Auth**
+   - 选择刚才创建的 **Gemini API Key** 凭证
+   - 保存工作流
+
+**为什么使用凭证管理？**
+
+✅ **安全性**：API Key 加密存储，不会明文出现在工作流 JSON 中
+✅ **可维护性**：一处修改凭证，所有使用该凭证的工作流自动更新
+✅ **可重用性**：多个工作流可以共享同一个凭证
+✅ **最佳实践**：符合 n8n 官方推荐的凭证管理方式
 
 ### 3. 创建保存目录
 
