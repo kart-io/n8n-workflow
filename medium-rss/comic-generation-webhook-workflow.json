@@ -60,7 +60,7 @@
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"深刻理解《{{ $json.body.书名 }}》这本书，将{{ $json.body.章节 }}内容，{{ $json.body.提示词 || '生成像《足球小将》那种专业分镜结构、漫画叙事节奏、对白气泡、拟声词、画格布局、视角变化、动态镜头，中文对白。请生成一张完整的漫画分镜图。' }}\"\n    }]\n  }],\n  \"generationConfig\": {\n    \"response_modalities\": [\"IMAGE\"],\n    \"response_mime_type\": \"image/jpeg\"\n  }\n}",
+        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"深刻理解《{{ $json.body.书名 }}》这本书，将{{ $json.body.章节 }}内容，{{ $json.body.提示词 || '生成像《足球小将》那种专业分镜结构、漫画叙事节奏、对白气泡、拟声词、画格布局、视角变化、动态镜头，中文对白。请生成一张完整的漫画分镜图。' }}\"\n    }]\n  }],\n  \"generationConfig\": {\n    \"response_modalities\": [\"Text\", \"Image\"]\n  }\n}",
         "options": {
           "response": {
             "response": {
