@@ -1,0 +1,345 @@
+{
+  "name": "漫画生成工作流 - Gemini 3 + Nano Banana Pro",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "漫画生成器",
+        "formDescription": "输入书名和章节信息，自动生成专业漫画分镜",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "书名",
+              "fieldType": "text",
+              "requiredField": true,
+              "placeholder": "例如：小岛经济学"
+            },
+            {
+              "fieldLabel": "章节",
+              "fieldType": "text",
+              "requiredField": true,
+              "placeholder": "例如：第一章"
+            },
+            {
+              "fieldLabel": "提示词（可选）",
+              "fieldType": "textarea",
+              "requiredField": false,
+              "placeholder": "例如：生成像《足球小将》那种专业分镜结构、漫画叙事节奏、对白气泡、拟声词、画格布局、视角变化、动态镜头，中文对白"
+            }
+          ]
+        },
+        "responseMode": "lastNode",
+        "options": {
+          "buttonLabel": "生成漫画"
+        }
+      },
+      "id": "form-trigger-node",
+      "name": "表单触发器",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.5,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://apimart.ai/api/v1/images/generations",
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"nano-banana-2\",\n  \"prompt\": \"深刻理解《{{ $json.书名 }}》这本书，将{{ $json.章节 }}内容，{{ $json['提示词（可选）'] || '生成像《足球小将》那种专业分镜结构、漫画叙事节奏、对白气泡、拟声词、画格布局、视角变化、动态镜头，中文对白' }}\",\n  \"n\": 1,\n  \"size\": \"1024x1024\",\n  \"quality\": \"hd\"\n}",
+        "options": {}
+      },
+      "id": "create-task-node",
+      "name": "创建生成任务",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [450, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "apimart-credentials",
+          "name": "Apimart API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-status-code",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": "200",
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-response-node",
+      "name": "检查响应状态",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 5,
+        "unit": "seconds"
+      },
+      "id": "wait-node",
+      "name": "等待5秒",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [850, 200]
+    },
+    {
+      "parameters": {
+        "url": "=https://apimart.ai/api/v1/tasks/{{ $('创建生成任务').item.json.task_id }}",
+        "method": "GET",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "query-task-node",
+      "name": "查询任务状态",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1050, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "apimart-credentials",
+          "name": "Apimart API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "chooseBranch",
+        "output": "input",
+        "rules": {
+          "rules": [
+            {
+              "outputKey": "completed",
+              "renameOutput": true,
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "check-progress",
+                    "leftValue": "={{ $json.progress }}",
+                    "rightValue": "100",
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "outputKey": "processing",
+              "renameOutput": true,
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "check-processing",
+                    "leftValue": "={{ $json.progress }}",
+                    "rightValue": "100",
+                    "operator": {
+                      "type": "number",
+                      "operation": "notEquals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "check-progress-node",
+      "name": "检查生成进度",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [1250, 200]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.result.image_url }}",
+        "method": "GET",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "download-image-node",
+      "name": "下载图片",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1450, 100]
+    },
+    {
+      "parameters": {
+        "fileName": "=/tmp/comics/{{ $('表单触发器').item.json.书名 }}_{{ $('表单触发器').item.json.章节 }}_{{ $now.format('yyyyMMdd_HHmmss') }}.png",
+        "dataPropertyName": "data"
+      },
+      "id": "save-file-node",
+      "name": "保存到本地",
+      "type": "n8n-nodes-base.writeBinaryFile",
+      "typeVersion": 1,
+      "position": [1650, 100]
+    },
+    {
+      "parameters": {},
+      "id": "error-node",
+      "name": "处理错误",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [850, 400]
+    },
+    {
+      "parameters": {},
+      "id": "loop-back-node",
+      "name": "Loop Back",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1250, 300]
+    }
+  ],
+  "connections": {
+    "表单触发器": {
+      "main": [
+        [
+          {
+            "node": "创建生成任务",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "创建生成任务": {
+      "main": [
+        [
+          {
+            "node": "检查响应状态",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "检查响应状态": {
+      "main": [
+        [
+          {
+            "node": "等待5秒",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "处理错误",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "等待5秒": {
+      "main": [
+        [
+          {
+            "node": "查询任务状态",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "查询任务状态": {
+      "main": [
+        [
+          {
+            "node": "检查生成进度",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "检查生成进度": {
+      "main": [
+        [
+          {
+            "node": "下载图片",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Back",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Back": {
+      "main": [
+        [
+          {
+            "node": "等待5秒",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "下载图片": {
+      "main": [
+        [
+          {
+            "node": "保存到本地",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2026-01-14T12:35:00.000Z",
+  "versionId": "1"
+}
