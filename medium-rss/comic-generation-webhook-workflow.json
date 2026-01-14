@@ -26,7 +26,7 @@
           "conditions": [
             {
               "id": "check-book-name",
-              "leftValue": "={{ $json.body.书名 }}",
+              "leftValue": "={{ $json.body.book }}",
               "operator": {
                 "type": "string",
                 "operation": "isNotEmpty",
@@ -35,7 +35,7 @@
             },
             {
               "id": "check-chapter",
-              "leftValue": "={{ $json.body.章节 }}",
+              "leftValue": "={{ $json.body.chapter }}",
               "operator": {
                 "type": "string",
                 "operation": "isNotEmpty",
@@ -60,7 +60,7 @@
         "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"深刻理解《{{ $json.body.书名 }}》这本书，将{{ $json.body.章节 }}内容，{{ $json.body.提示词 || '生成像《足球小将》那种专业分镜结构、漫画叙事节奏、对白气泡、拟声词、画格布局、视角变化、动态镜头，中文对白。请生成一张完整的漫画分镜图。' }}\"\n    }]\n  }],\n  \"generationConfig\": {\n    \"response_modalities\": [\"Text\", \"Image\"]\n  }\n}",
+        "jsonBody": "={\n  \"contents\": [{\n    \"parts\": [{\n      \"text\": \"深刻理解《{{ $json.body.book }}》这本书，将{{ $json.body.chapter }}内容，{{ $json.body.prompt || '生成像《足球小将》那种专业分镜结构、漫画叙事节奏、对白气泡、拟声词、画格布局、视角变化、动态镜头，中文对白。请生成一张完整的漫画分镜图。' }}\"\n    }]\n  }],\n  \"generationConfig\": {\n    \"response_modalities\": [\"Text\", \"Image\"]\n  }\n}",
         "options": {
           "response": {
             "response": {
@@ -114,7 +114,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// 提取 Gemini 返回的图片数据\nconst candidates = $input.item.json.candidates;\n\nif (!candidates || candidates.length === 0) {\n  throw new Error('No candidates found in response');\n}\n\nconst parts = candidates[0].content.parts;\nif (!parts || parts.length === 0) {\n  throw new Error('No parts found in content');\n}\n\n// 查找 inline_data\nlet imageData = null;\nlet mimeType = 'image/jpeg';\n\nfor (const part of parts) {\n  if (part.inline_data) {\n    imageData = part.inline_data.data;\n    mimeType = part.inline_data.mime_type || 'image/jpeg';\n    break;\n  }\n}\n\nif (!imageData) {\n  throw new Error('No image data found in response');\n}\n\n// 将 base64 数据转换为二进制\nconst buffer = Buffer.from(imageData, 'base64');\n\n// 获取原始 webhook 数据\nconst webhookData = $('Webhook 触发器').item.json.body;\n\nreturn {\n  json: {\n    书名: webhookData.书名,\n    章节: webhookData.章节,\n    mimeType: mimeType,\n    imageSize: buffer.length,\n    success: true,\n    message: '漫画生成成功'\n  },\n  binary: {\n    data: {\n      data: buffer.toString('base64'),\n      mimeType: mimeType,\n      fileName: `${webhookData.书名}_${webhookData.章节}_${new Date().getTime()}.jpg`\n    }\n  }\n};"
+        "jsCode": "// 提取 Gemini 返回的图片数据\nconst candidates = $input.item.json.candidates;\n\nif (!candidates || candidates.length === 0) {\n  throw new Error('No candidates found in response');\n}\n\nconst parts = candidates[0].content.parts;\nif (!parts || parts.length === 0) {\n  throw new Error('No parts found in content');\n}\n\n// 查找 inline_data\nlet imageData = null;\nlet mimeType = 'image/jpeg';\n\nfor (const part of parts) {\n  if (part.inline_data) {\n    imageData = part.inline_data.data;\n    mimeType = part.inline_data.mime_type || 'image/jpeg';\n    break;\n  }\n}\n\nif (!imageData) {\n  throw new Error('No image data found in response');\n}\n\n// 将 base64 数据转换为二进制\nconst buffer = Buffer.from(imageData, 'base64');\n\n// 获取原始 webhook 数据\nconst webhookData = $('Webhook 触发器').item.json.body;\n\nreturn {\n  json: {\n    book: webhookData.book,\n    chapter: webhookData.chapter,\n    mimeType: mimeType,\n    imageSize: buffer.length,\n    success: true,\n    message: '漫画生成成功'\n  },\n  binary: {\n    data: {\n      data: buffer.toString('base64'),\n      mimeType: mimeType,\n      fileName: `${webhookData.book}_${webhookData.chapter}_${new Date().getTime()}.jpg`\n    }\n  }\n};"
       },
       "id": "extract-image",
       "name": "提取图片数据",
@@ -124,7 +124,7 @@
     },
     {
       "parameters": {
-        "fileName": "=/tmp/comics/{{ $json.书名 }}_{{ $json.章节 }}_{{ $now.format('yyyyMMdd_HHmmss') }}.jpg",
+        "fileName": "=/tmp/comics/{{ $json.book }}_{{ $json.chapter }}_{{ $now.format('yyyyMMdd_HHmmss') }}.jpg",
         "dataPropertyName": "data"
       },
       "id": "save-file",
@@ -135,7 +135,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// 返回错误：缺少必填字段\nreturn {\n  json: {\n    success: false,\n    error: '缺少必填字段',\n    message: '请提供书名和章节信息',\n    required: ['书名', '章节'],\n    received: $input.item.json.body || {}\n  }\n};"
+        "jsCode": "// 返回错误：缺少必填字段\nreturn {\n  json: {\n    success: false,\n    error: '缺少必填字段',\n    message: '请提供 book 和 chapter 参数',\n    required: ['book', 'chapter'],\n    received: $input.item.json.body || {}\n  }\n};"
       },
       "id": "error-missing-fields",
       "name": "缺少必填字段",
