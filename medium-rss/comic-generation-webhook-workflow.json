@@ -72,7 +72,7 @@
       "id": "generate-with-gemini",
       "name": "Gemini 生成图片",
       "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.3,
+      "typeVersion": 4.2,
       "position": [650, 200],
       "onError": "continueRegularOutput",
       "credentials": {
@@ -231,6 +231,6 @@
   "staticData": null,
   "tags": [],
   "triggerCount": 0,
-  "updatedAt": "2026-01-14T13:50:33.664Z",
+  "updatedAt": "2026-01-14T13:59:24.739Z",
   "versionId": "1"
 }
