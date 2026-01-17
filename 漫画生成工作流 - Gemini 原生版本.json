@@ -1,0 +1,570 @@
+{
+  "name": "漫画生成工作流 - Gemini 原生版本",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "生成图片",
+        "formFields": {
+          "values": [
+            {
+              "fieldName": "image-description",
+              "fieldLabel": "图片描述",
+              "fieldType": "textarea",
+              "placeholder": "输入图片的描述",
+              "requiredField": true
+            },
+            {
+              "fieldName": "image-resolution",
+              "fieldLabel": "图片分辨率"
+            },
+            {
+              "fieldName": "image_count",
+              "fieldLabel": "图片数量",
+              "fieldType": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4364c467-d83d-455a-8c2d-4ba58127b53e",
+      "name": "On form submission",
+      "position": [
+        0,
+        0
+      ],
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.4,
+      "webhookId": "82dfd8fd-29aa-47ef-8ded-0a786b93131c"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 生成批次ID和年月路径\nconst now = new Date();\nconst batchId = `batch_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;\nconst yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;\n\nconst imageCount = $input.item.json['image_count'] || 1;\nconst description = $input.item.json['image-description'];\nconst resolution = $input.item.json['image-resolution'];\n\nreturn {\n  json: {\n    'image-description': description,\n    'image-resolution': resolution,\n    'image_count': imageCount,\n    'batch_id': batchId,\n    'year_month': yearMonth\n  }\n};"
+      },
+      "id": "prep-batch-metadata-node",
+      "name": "Prepare Batch Metadata",
+      "position": [
+        256,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "operation": "search",
+        "searchMethod": "query",
+        "queryString": "={{ 'name=\\'' + $json.year_month + '\\' and \\'1lzyHUBjaKZZlGntaWwtY0ioF3Ub9S7rd\\' in parents and mimeType=\\'application/vnd.google-apps.folder\\' and trashed=false' }}",
+        "options": {}
+      },
+      "id": "find-year-month-folder",
+      "name": "Find Year-Month Folder",
+      "position": [
+        464,
+        0
+      ],
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "vJg7aymsCJ7OBF8u",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-year-month-exists",
+      "name": "Check Year-Month Exists",
+      "position": [
+        672,
+        0
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "name": "={{ $('Prepare Batch Metadata').first().json.year_month }}",
+        "driveId": {
+          "__rl": true,
+          "cachedResultName": "My Drive",
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "cachedResultName": "n8n-img",
+          "mode": "list",
+          "value": "1lzyHUBjaKZZlGntaWwtY0ioF3Ub9S7rd"
+        },
+        "resource": "folder",
+        "options": {}
+      },
+      "id": "create-year-month-folder",
+      "name": "Create Year-Month Folder",
+      "position": [
+        880,
+        -100
+      ],
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "vJg7aymsCJ7OBF8u",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 从查找结果中提取已存在的文件夹ID\n// Google Drive 搜索直接返回文件对象，不是 {files: [...]} 格式\nconst yearMonthFolderId = $input.item.json.id;\nconst batchId = $('Prepare Batch Metadata').first().json.batch_id;\nconst imageCount = $('Prepare Batch Metadata').first().json.image_count;\nconst description = $('Prepare Batch Metadata').first().json['image-description'];\nconst resolution = $('Prepare Batch Metadata').first().json['image-resolution'];\n\nreturn {\n  json: {\n    yearMonthFolderId,\n    batchId,\n    imageCount,\n    'image-description': description,\n    'image-resolution': resolution\n  }\n};"
+      },
+      "id": "extract-existing-folder-id",
+      "name": "Extract Existing Folder ID",
+      "position": [
+        880,
+        100
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "jsCode": "// 从创建结果中提取新建的文件夹ID\nconst yearMonthFolderId = $input.item.json.id;\nconst batchId = $('Prepare Batch Metadata').first().json.batch_id;\nconst imageCount = $('Prepare Batch Metadata').first().json.image_count;\nconst description = $('Prepare Batch Metadata').first().json['image-description'];\nconst resolution = $('Prepare Batch Metadata').first().json['image-resolution'];\n\nreturn {\n  json: {\n    yearMonthFolderId,\n    batchId,\n    imageCount,\n    'image-description': description,\n    'image-resolution': resolution\n  }\n};"
+      },
+      "id": "extract-new-folder-id",
+      "name": "Extract New Folder ID",
+      "position": [
+        1088,
+        -100
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "operation": "search",
+        "searchMethod": "query",
+        "queryString": "={{ 'name=\\'' + $json.batchId + '\\' and \\'' + $json.yearMonthFolderId + '\\' in parents and mimeType=\\'application/vnd.google-apps.folder\\' and trashed=false' }}",
+        "options": {}
+      },
+      "id": "find-batch-folder",
+      "name": "Find Batch Folder",
+      "position": [
+        1296,
+        0
+      ],
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "vJg7aymsCJ7OBF8u",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-batch-exists",
+      "name": "Check Batch Exists",
+      "position": [
+        1504,
+        0
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "name": "={{ $('Prepare Batch Metadata').first().json.batch_id }}",
+        "driveId": {
+          "__rl": true,
+          "cachedResultName": "My Drive",
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $if($('Extract Existing Folder ID').isExecuted, $('Extract Existing Folder ID').first().json.yearMonthFolderId, $('Extract New Folder ID').first().json.yearMonthFolderId) }}"
+        },
+        "resource": "folder",
+        "options": {}
+      },
+      "id": "create-batch-folder",
+      "name": "Create Batch Folder",
+      "position": [
+        1712,
+        -100
+      ],
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "vJg7aymsCJ7OBF8u",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 从查找结果中提取已存在的批次文件夹ID\n// Google Drive 搜索直接返回文件对象，不是 {files: [...]} 格式\nconst batchFolderId = $input.item.json.id;\nconst imageCount = $('Prepare Batch Metadata').first().json.image_count;\nconst description = $('Prepare Batch Metadata').first().json['image-description'];\nconst resolution = $('Prepare Batch Metadata').first().json['image-resolution'];\nconst batchId = $('Prepare Batch Metadata').first().json.batch_id;\n\nreturn {\n  json: {\n    batchFolderId,\n    imageCount,\n    'image-description': description,\n    'image-resolution': resolution,\n    batch_id: batchId\n  }\n};"
+      },
+      "id": "extract-existing-batch-id",
+      "name": "Extract Existing Batch ID",
+      "position": [
+        1712,
+        100
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "jsCode": "// 从创建结果中提取新建的批次文件夹ID\nconst batchFolderId = $input.item.json.id;\nconst imageCount = $('Prepare Batch Metadata').first().json.image_count;\nconst description = $('Prepare Batch Metadata').first().json['image-description'];\nconst resolution = $('Prepare Batch Metadata').first().json['image-resolution'];\nconst batchId = $('Prepare Batch Metadata').first().json.batch_id;\n\nreturn {\n  json: {\n    batchFolderId,\n    imageCount,\n    'image-description': description,\n    'image-resolution': resolution,\n    batch_id: batchId\n  }\n};"
+      },
+      "id": "extract-new-batch-id",
+      "name": "Extract New Batch ID",
+      "position": [
+        1920,
+        -100
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "jsCode": "// 智能解析用户描述，为每张图片生成独特的内容\nconst inputJson = $input.item.json;\nconst imageCount = inputJson.imageCount || 1;\nconst description = inputJson['image-description'] || '';\nconst resolution = inputJson['image-resolution'];\nconst batchFolderId = inputJson.batchFolderId;\nconst batchId = inputJson.batch_id;\n\n// 尝试智能分段解析描述内容\nfunction parseDescriptionSegments(desc, count) {\n  const segments = [];\n  \n  // 模式1: 检测 \"第X张/页/幅\" 格式\n  const pagePattern = /第[一二三四五六七八九十\\d]+[张页幅][：:](.*?)(?=第[一二三四五六七八九十\\d]+[张页幅][：:]|$)/gs;\n  let matches = [...desc.matchAll(pagePattern)];\n  if (matches.length >= count) {\n    return matches.slice(0, count).map(m => m[1].trim());\n  }\n  \n  // 模式2: 检测数字编号 \"1. xxx 2. xxx\" 或 \"1、xxx 2、xxx\"\n  const numPattern = /(?:^|\\n)\\s*[\\d]+[.、)）]\\s*(.*?)(?=(?:^|\\n)\\s*[\\d]+[.、)）]|$)/gs;\n  matches = [...desc.matchAll(numPattern)];\n  if (matches.length >= count) {\n    return matches.slice(0, count).map(m => m[1].trim());\n  }\n  \n  // 模式3: 检测 \"起/承/转/合\" 或 \"开头/发展/高潮/结尾\" 格式\n  const storyPattern = /(起|承|转|合|开头|发展|高潮|结尾|开始|中间|结束)[：:](.*?)(?=(起|承|转|合|开头|发展|高潮|结尾|开始|中间|结束)[：:]|$)/gs;\n  matches = [...desc.matchAll(storyPattern)];\n  if (matches.length >= count) {\n    return matches.slice(0, count).map(m => `【${m[1]}】${m[2].trim()}`);\n  }\n  \n  // 模式4: 用分隔符分段 (---、===、***、换行+换行)\n  const separators = /(?:---|===|\\*\\*\\*|\\n\\n+)/;\n  const parts = desc.split(separators).map(p => p.trim()).filter(p => p.length > 10);\n  if (parts.length >= count) {\n    return parts.slice(0, count);\n  }\n  \n  // 模式5: 如果没有明确分段，为每张图片添加叙事指引\n  const narrativeGuides = [\n    '【起】故事开篇，建立场景和人物，引入核心概念',\n    '【承】发展情节，深入解释概念，角色开始理解',\n    '【转】遭遇挑战或转折，概念在实践中遇到问题',\n    '【合】解决问题，领悟真谛，概念得到升华'\n  ];\n  \n  for (let i = 0; i < count; i++) {\n    const guide = narrativeGuides[i % narrativeGuides.length];\n    segments.push(`${guide}\\n\\n原始内容：${desc}`);\n  }\n  \n  return segments;\n}\n\n// 解析分段内容\nconst segments = parseDescriptionSegments(description, imageCount);\n\nconst items = [];\nfor (let i = 0; i < imageCount; i++) {\n  const segmentDesc = segments[i] || description;\n  items.push({\n    json: {\n      'image-description': segmentDesc,\n      'full-description': description,\n      'image-resolution': resolution,\n      'image_count': imageCount,\n      'current_index': i + 1,\n      'total_count': imageCount,\n      'batch_folder_id': batchFolderId,\n      'batch_id': batchId\n    }\n  });\n}\n\nreturn items;"
+      },
+      "id": "prep-loop-items-node",
+      "name": "Prepare Loop Items",
+      "position": [
+        2128,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "modelId": {
+          "__rl": true,
+          "cachedResultName": "models/gemini-2.5-flash-image (Nano Banana)",
+          "mode": "list",
+          "value": "models/gemini-2.5-flash-image"
+        },
+        "prompt": "=【重要】你必须使用中文(简体中文)生成所有文字内容。You MUST generate all text in Simplified Chinese.\n\n⚠️【关键要求】这是一张【全彩色】漫画，绝对不能是黑白的！\n- 必须使用丰富的色彩：红、橙、黄、绿、蓝、紫等\n- 人物皮肤、头发、衣服都必须有颜色\n- 背景必须有彩色渲染\n- 禁止生成黑白、灰度或素描风格的图片\n\n你是一名专业日本漫画分镜导演。\n\n【当前任务】这是系列漫画的第 {{ $json.current_index }} 页，共 {{ $json.total_count }} 页。\n\n请【深刻理解并视觉化】以下内容，将其改编为这一页的专业漫画分镜：\n{{ $json[\"image-description\"] }}\n\n【重要】每一页必须有独特的内容和画面，不要重复其他页的场景！\n- 第1页通常是【起】：建立场景、介绍人物、引出主题\n- 第2页通常是【承】：发展情节、深入解释、角色互动\n- 第3页通常是【转】：遭遇挑战、产生冲突、情节转折\n- 第4页通常是【合】：解决问题、总结升华、完美收尾\n\n漫画风格与参考:\n- 日本王道热血漫画风格\n- 强烈参考《足球小将》的分镜语言与叙事节奏\n- 教学 + 热血并存的知识漫画表现方式\n\n分镜与画面设计要求:\n- 一整页漫画分镜结构\n- 多画格布局(大画格与小画格交替)\n- 使用远景、中景、特写、仰视、俯视等镜头切换\n- 画面充满速度线、动作线、张力构图\n- 角色动作夸张，情绪外放，具有戏剧冲突\n\n【关键】文字要求(必须严格遵守):\n- ⚠️ 所有文字必须是简体中文(Simplified Chinese)\n- ⚠️ 绝对禁止使用英文、日文或其他语言\n- ⚠️ 对话、旁白、拟声词都必须是中文\n- 使用漫画对白气泡，例如:【太好了!】【这就是储蓄的力量!】\n- 包含中文漫画拟声词，例如:咚!!呼——!啪!轰!嘭!\n\n⚠️【画面风格 - 必须是全彩色】:\n- 日式【全彩色】漫画分镜风格 (Full Color Manga)\n- 鲜艳明亮的配色方案\n- 清晰墨线轮廓 + 全彩上色\n- 热血但专业的配色方案\n- 保留速度线与动态效果\n- 明确画格边框(gutter)\n- 人物有彩色的皮肤、头发、眼睛、衣服\n- 背景有彩色渲染，不能是纯白或灰色\n\n技术参数:\n- 分辨率:{{ $json[\"image-resolution\"] }}\n- 色彩模式: Full Color (全彩)\n\n限制:\n- 不要水印\n- 不要 logo\n- 不要真实摄影风格\n- 必须是漫画分镜页面，而不是单幅插画\n- ⚠️ 严禁使用非中文文字\n- ⚠️ 这一页的内容必须与其他页不同！\n- ⚠️ 绝对禁止黑白、灰度、素描风格 - 必须是全彩色！\n\n请确保生成的漫画中所有文字都是简体中文，并且是全彩色图片。\nAll text in the manga must be in Simplified Chinese. The image MUST be in FULL COLOR, NOT black and white.\n",
+        "options": {}
+      },
+      "id": "d79784c7-beaf-48c2-9b66-0fca2e4f7a6c",
+      "name": "Generate an image",
+      "position": [
+        2544,
+        0
+      ],
+      "retryOnFail": true,
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "LuY5kSllI9G8FT5i",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      },
+      "maxTries": 3
+    },
+    {
+      "parameters": {
+        "jsCode": "// 处理所有输入项，为每张图片生成唯一文件名\n// 同时验证 binary 数据是否有效，跳过空文件\nconst inputItems = $input.all();\nconst loopItems = $('Prepare Loop Items').all();\nconst results = [];\n\nfor (let i = 0; i < inputItems.length; i++) {\n  const item = inputItems[i];\n  \n  // 验证 binary 数据是否存在且有效\n  const binaryData = item.binary?.data;\n  if (!binaryData) {\n    console.log(`跳过第 ${i + 1} 项：没有 binary 数据`);\n    continue;\n  }\n  \n  // 检查文件大小，跳过空文件 (0 B)\n  const fileSize = binaryData.fileSize || '0 B';\n  if (fileSize === '0 B' || fileSize === '0') {\n    console.log(`跳过第 ${i + 1} 项：文件大小为 0`);\n    continue;\n  }\n  \n  const now = new Date();\n  const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, 19);\n  const randomStr = Math.random().toString(36).substring(2, 8);\n  \n  const itemData = loopItems[i]?.json || {};\n  const description = itemData['image-description'] || '';\n  const batchFolderId = itemData['batch_folder_id'];\n  \n  // 提取中文、英文、数字作为文件名前缀\n  let prefix = 'manga';\n  if (description && typeof description === 'string') {\n    const extracted = description.replace(/[^一-龥a-zA-Z0-9]/g, '').slice(0, 20);\n    if (extracted) {\n      prefix = extracted;\n    }\n  }\n  \n  // 使用实际有效项的索引\n  const currentIndex = results.length + 1;\n  const fileName = `${prefix}_${currentIndex}of${inputItems.length}_${timestamp}_${randomStr}.png`;\n  \n  results.push({\n    json: {\n      fileName,\n      timestamp,\n      description: description || 'No description',\n      currentIndex,\n      totalCount: inputItems.length,\n      'batch_folder_id': batchFolderId\n    },\n    binary: item.binary\n  });\n}\n\n// 如果没有有效的图片，抛出错误\nif (results.length === 0) {\n  throw new Error('没有有效的图片可以上传，所有生成的图片都是空的');\n}\n\nreturn results;"
+      },
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "name": "Generate Unique Filename",
+      "position": [
+        2752,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "upload",
+        "name": "={{ $json.fileName }}",
+        "driveId": {
+          "__rl": true,
+          "cachedResultName": "My Drive",
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json['batch_folder_id'] }}"
+        },
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "id": "73916633-fa59-4c2b-90ea-bb8355a6bfdf",
+      "name": "Upload file",
+      "position": [
+        2960,
+        0
+      ],
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "vJg7aymsCJ7OBF8u",
+          "name": "Google Drive account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Prepare Batch Metadata",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Prepare Batch Metadata": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Find Year-Month Folder",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Find Year-Month Folder": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Check Year-Month Exists",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Check Year-Month Exists": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Extract Existing Folder ID",
+            "type": "main"
+          }
+        ],
+        [
+          {
+            "index": 0,
+            "node": "Create Year-Month Folder",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Create Year-Month Folder": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Extract New Folder ID",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Extract Existing Folder ID": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Find Batch Folder",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Extract New Folder ID": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Find Batch Folder",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Find Batch Folder": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Check Batch Exists",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Check Batch Exists": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Extract Existing Batch ID",
+            "type": "main"
+          }
+        ],
+        [
+          {
+            "index": 0,
+            "node": "Create Batch Folder",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Create Batch Folder": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Extract New Batch ID",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Extract Existing Batch ID": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Prepare Loop Items",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Extract New Batch ID": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Prepare Loop Items",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Prepare Loop Items": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Generate an image",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Generate an image": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Generate Unique Filename",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Generate Unique Filename": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Upload file",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Upload file": {
+      "main": []
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "89fb31c8-1fcd-443e-81c7-094c6d6eca6b",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "9b9e0f7429dd3efb9c711488dfce0efa1b15fbee313d3c407871cbb7df29476a"
+  },
+  "id": "tfrHENJDXmgWbihq",
+  "tags": []
+}
